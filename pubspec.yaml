@@ -1,7 +1,7 @@
-name: qgami
-description: "A Flutter button widget that opens a full-screen in-app WebView."
+name: qgami_sdk
+description: "qgami_sdk for integrating QGami services"
 version: 0.0.1
-homepage: https://pub.dev/packages/qgami
+homepage: https://pub.dev/packages/qgami_sdk
 
 environment:
   sdk: ^3.10.4

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qgami/qgami.dart';
+import 'package:qgami_sdk/qgami.dart';
 
 void main() {
   testWidgets('QgamiButton renders default label', (WidgetTester tester) async {

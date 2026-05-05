@@ -1,6 +1,6 @@
 # qgami
 
-qgami provides a tappable Flutter widget that opens a full-screen in-app WebView.
+qgami_sdk provides a tappable Flutter widget that opens a full-screen in-app WebView.
 
 ## Features
 
