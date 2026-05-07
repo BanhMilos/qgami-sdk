@@ -5,7 +5,15 @@
       "name": "Flutter Example",
       "request": "launch",
       "type": "dart",
-      "program": "example/main.dart"
+      "program": "example/main.dart",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "Flutter Example (Release)",
+      "request": "launch",
+      "type": "dart",
+      "program": "example/main.dart",
+      "flutterMode": "release"
     }
   ]
 }
