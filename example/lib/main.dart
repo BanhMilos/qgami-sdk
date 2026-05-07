@@ -24,6 +24,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   bool identified = false;
+  List<String> gameSlugs = ['slot-machine-qgami', 'lucky-spin-qgami'];
   @override
   void initState() {
     super.initState();
@@ -54,49 +55,42 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Qgami Example')),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          QgamiButton(
-            initialUrl: 'https://games-dev.qgami.com/chance/lucky-spin/',
-            disabled: !identified,
-            customBuilder: (context) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.green,
-                borderRadius: BorderRadius.circular(8),
-              ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          spacing: 12,
+          children: [
+            ...gameSlugs.map(
+              (slug) => QgamiButton(
+                gameSlug: slug,
+                disabled: !identified,
+                customBuilder: (context) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
 
-              child: const Text(
-                'Spin the Wheel',
-                style: TextStyle(color: Colors.white),
+                  child: Text(
+                    slug,
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+                onWebViewEvent: (event) {},
               ),
             ),
-            onWebViewEvent: (event) {},
-          ),
-          QgamiButton(
-            initialUrl: 'https://games-dev.qgami.com/chance/slot-machine/',
-            disabled: !identified,
-            customBuilder: (context) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.green,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Slot Machine',
-                style: TextStyle(color: Colors.white),
-              ),
+
+            ElevatedButton(
+              onPressed: () async {
+                await _identifyUser();
+              },
+              child: const Text('Reinitialize '),
             ),
-            onWebViewEvent: (event) {},
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await _identifyUser();
-            },
-            child: const Text('Reinitialize '),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

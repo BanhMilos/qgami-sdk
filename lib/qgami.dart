@@ -3,6 +3,10 @@ import 'package:qgami_sdk/qgami_core.dart';
 export 'qgami_button.dart';
 
 class QGami {
+  static bool get isInitialized => QGamiCore.instance.isInitialized;
+  static bool get isIdentified => QGamiCore.instance.isIdentified;
+  static bool get isReady => QGamiCore.instance.isReady;
+
   static Future<void> initialize({
     required String apiKey,
     required String environment,
@@ -37,6 +41,16 @@ class QGami {
 
   static void openHub() {
     QGamiCore.instance.openHub();
+  }
+
+  static Future<String?> getGameUrl({required String gameSlug}) {
+    return QGamiCore.instance.getGameUrl(gameSlug: gameSlug);
+  }
+
+  static Future<bool> waitUntilReady({
+    Duration timeout = const Duration(seconds: 15),
+  }) {
+    return QGamiCore.instance.waitUntilReady(timeout: timeout);
   }
 
   static Map<String, dynamic> getInitGameMessage({

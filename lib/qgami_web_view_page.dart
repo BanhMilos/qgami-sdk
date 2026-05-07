@@ -6,15 +6,15 @@ import 'package:qgami_sdk/qgami_web_view_event.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class QgamiWebViewPage extends StatefulWidget {
-  final String initialUrl;
   final ValueChanged<QgamiWebViewEvent>? onWebViewEvent;
-  final String? gameSlug;
+  final String gameSlug;
+  final String url;
 
   const QgamiWebViewPage({
     super.key,
-    required this.initialUrl,
     this.onWebViewEvent,
-    this.gameSlug,
+    required this.gameSlug,
+    required this.url,
   });
 
   @override
@@ -22,10 +22,14 @@ class QgamiWebViewPage extends StatefulWidget {
 }
 
 class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
+  static const int _maxDebugEvents = 200;
+
   final WebViewController controller = WebViewController();
   bool _didSendInitGame = false;
   final List<QgamiWebViewEvent> _debugEvents = [];
+  final List<({JavaScriptLogLevel level, String message})> _consoleLogs = [];
   bool _showDebugPanel = false;
+  int _debugTab = 0; // 0 = Events, 1 = Console
 
   @override
   void initState() {
@@ -40,17 +44,9 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (int progress) {
-            // Update loading bar.
-          },
           onPageStarted: (String url) async {
             await _installMessageBridge();
           },
-          onPageFinished: (String url) async {
-            // _initGame();
-          },
-          onHttpError: (HttpResponseError error) {},
-          onWebResourceError: (WebResourceError error) {},
           onNavigationRequest: (NavigationRequest request) {
             if (request.url.startsWith('https://www.youtube.com/')) {
               return NavigationDecision.prevent;
@@ -58,11 +54,24 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
             return NavigationDecision.navigate;
           },
         ),
-      );
+      )
+      ..setOnConsoleMessage((JavaScriptConsoleMessage msg) {
+        setState(() {
+          if (_consoleLogs.length >= _maxDebugEvents) _consoleLogs.removeAt(0);
+          _consoleLogs.add((level: msg.level, message: msg.message));
+        });
+      });
   }
 
-  void _loadInitialUrl() {
-    controller.loadRequest(Uri.parse(widget.initialUrl));
+  void _loadInitialUrl() async {
+    final playUrl = widget.url;
+    final uri = Uri.tryParse(playUrl);
+    if (uri == null) {
+      debugPrint('LOG : Qgami invalid play URL: $playUrl');
+      return;
+    }
+
+    controller.loadRequest(uri);
   }
 
   Future<void> _installMessageBridge() async {
@@ -112,7 +121,6 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
         }
 
         window.postMessage(payload, '*');
-        window.dispatchEvent(new MessageEvent('message', { data: payload }));
       })();
     ''');
   }
@@ -125,7 +133,6 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
       paddingTop: MediaQuery.of(context).padding.top,
       paddingBottom: MediaQuery.of(context).padding.bottom,
     );
-    // AP3A.240905.015.A2
     try {
       await _sendMessageToWeb(message);
       debugPrint('LOG : Qgami INIT_GAME sent $message');
@@ -151,40 +158,55 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
     }
   }
 
+  void _recordEvent(QgamiWebViewEvent event) {
+    if (_debugEvents.length >= _maxDebugEvents) {
+      _debugEvents.removeAt(0);
+    }
+    _debugEvents.add(event);
+    setState(() {});
+    widget.onWebViewEvent?.call(event);
+  }
+
+  void _handleStructuredEvent(QgamiWebViewEvent event) {
+    switch (event.type) {
+      case QgamiWebViewEvent.gameReady:
+        if (!_didSendInitGame) {
+          _didSendInitGame = true;
+          _initGame();
+        }
+        break;
+      case QgamiWebViewEvent.accessTokenExpired:
+        _updateAccessToken();
+        break;
+      case QgamiWebViewEvent.gameLoading:
+      case QgamiWebViewEvent.gameLoaded:
+      case QgamiWebViewEvent.gamePlayStart:
+      case QgamiWebViewEvent.gamePlayResult:
+      case QgamiWebViewEvent.gamePlayError:
+        break;
+      case QgamiWebViewEvent.gameClose:
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   void _initializeJavaScriptChannels() {
     controller.addJavaScriptChannel(
       'QgamiChannel',
       onMessageReceived: (JavaScriptMessage message) {
         try {
           final decoded = jsonDecode(message.message);
-          if (decoded is Map<String, dynamic>) {
-            final event = QgamiWebViewEvent.fromJson(decoded);
+          if (decoded is Map) {
+            final event = QgamiWebViewEvent.fromJson(
+              Map<String, dynamic>.from(decoded),
+            );
             debugPrint('LOG : QgamiChannel event: $event');
-            //_updateAccessToken();
-
-            switch (event.type) {
-              case QgamiWebViewEvent.gameReady:
-                if (!_didSendInitGame) {
-                  _didSendInitGame = true;
-                  _initGame();
-                }
-                break;
-              case QgamiWebViewEvent.accessTokenExpired:
-                _updateAccessToken();
-                break;
-              case QgamiWebViewEvent.gameLoading:
-              case QgamiWebViewEvent.gameLoaded:
-              case QgamiWebViewEvent.gamePlayStart:
-              case QgamiWebViewEvent.gamePlayResult:
-              case QgamiWebViewEvent.gamePlayError:
-              case QgamiWebViewEvent.gameClose:
-                break;
-              default:
-                break;
-            }
-
-            setState(() => _debugEvents.add(event));
-            widget.onWebViewEvent?.call(event);
+            _handleStructuredEvent(event);
+            _recordEvent(event);
             return;
           }
 
@@ -193,8 +215,7 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
             data: {'payload': decoded},
           );
           debugPrint('LOG : QgamiChannel raw event: $event');
-          setState(() => _debugEvents.add(event));
-          widget.onWebViewEvent?.call(event);
+          _recordEvent(event);
         } catch (e) {
           final event = QgamiWebViewEvent(
             type: 'raw_text_message',
@@ -203,16 +224,40 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
           debugPrint(
             'LOG : QgamiChannel parse fallback: $e, raw=${message.message}',
           );
-          setState(() => _debugEvents.add(event));
-          widget.onWebViewEvent?.call(event);
+          _recordEvent(event);
         }
       },
     );
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  static Color _consoleColor(JavaScriptLogLevel level) {
+    switch (level) {
+      case JavaScriptLogLevel.error:
+        return Colors.redAccent;
+      case JavaScriptLogLevel.warning:
+        return Colors.orangeAccent;
+      case JavaScriptLogLevel.debug:
+        return Colors.blueAccent;
+      case JavaScriptLogLevel.info:
+        return Colors.cyanAccent;
+      default:
+        return Colors.greenAccent;
+    }
+  }
+
+  static String _consolePrefix(JavaScriptLogLevel level) {
+    switch (level) {
+      case JavaScriptLogLevel.error:
+        return '[ERR]';
+      case JavaScriptLogLevel.warning:
+        return '[WRN]';
+      case JavaScriptLogLevel.debug:
+        return '[DBG]';
+      case JavaScriptLogLevel.info:
+        return '[INF]';
+      default:
+        return '[LOG]';
+    }
   }
 
   @override
@@ -228,7 +273,7 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
               right: 8,
               bottom: 80,
               child: Material(
-                color: Colors.black.withOpacity(0.85),
+                color: Colors.black.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -240,17 +285,26 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
                       ),
                       child: Row(
                         children: [
-                          const Text(
-                            'Events',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          _TabButton(
+                            label: 'Events',
+                            active: _debugTab == 0,
+                            onTap: () => setState(() => _debugTab = 0),
+                          ),
+                          const SizedBox(width: 8),
+                          _TabButton(
+                            label: 'Console',
+                            active: _debugTab == 1,
+                            onTap: () => setState(() => _debugTab = 1),
                           ),
                           const Spacer(),
                           TextButton(
-                            onPressed: () =>
-                                setState(() => _debugEvents.clear()),
+                            onPressed: () => setState(() {
+                              if (_debugTab == 0) {
+                                _debugEvents.clear();
+                              } else {
+                                _consoleLogs.clear();
+                              }
+                            }),
                             child: const Text(
                               'Clear',
                               style: TextStyle(
@@ -264,39 +318,69 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
                     ),
                     const Divider(color: Colors.white24, height: 1),
                     Expanded(
-                      child: _debugEvents.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No events yet',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(8),
-                              itemCount: _debugEvents.length,
-                              itemBuilder: (context, index) {
-                                final e =
-                                    _debugEvents[_debugEvents.length -
-                                        1 -
-                                        index];
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 2,
-                                  ),
-                                  child: Text(
-                                    '[${_debugEvents.length - index}] ${e.type}${e.data.isNotEmpty ? '  ${e.data}' : ''}',
-                                    style: const TextStyle(
-                                      color: Colors.greenAccent,
-                                      fontSize: 11,
-                                      fontFamily: 'monospace',
+                      child: _debugTab == 0
+                          ? (_debugEvents.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'No events yet',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 12,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.all(8),
+                                    itemCount: _debugEvents.length,
+                                    itemBuilder: (context, index) {
+                                      final e = _debugEvents[index];
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 2,
+                                        ),
+                                        child: Text(
+                                          '[${index + 1}] ${e.type}${e.data.isNotEmpty ? '  ${e.data}' : ''}',
+                                          style: const TextStyle(
+                                            color: Colors.greenAccent,
+                                            fontSize: 11,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ))
+                          : (_consoleLogs.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'No console output yet',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.all(8),
+                                    itemCount: _consoleLogs.length,
+                                    itemBuilder: (context, index) {
+                                      final log = _consoleLogs[index];
+                                      final color = _consoleColor(log.level);
+                                      final prefix = _consolePrefix(log.level);
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 2,
+                                        ),
+                                        child: Text(
+                                          '$prefix ${log.message}',
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 11,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  )),
                     ),
                   ],
                 ),
@@ -320,7 +404,7 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
                       onPressed: () =>
                           setState(() => _showDebugPanel = !_showDebugPanel),
                     ),
-                    if (_debugEvents.isNotEmpty)
+                    if (_debugEvents.isNotEmpty || _consoleLogs.isNotEmpty)
                       Positioned(
                         top: 6,
                         right: 6,
@@ -331,7 +415,7 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
                             shape: BoxShape.circle,
                           ),
                           child: Text(
-                            '${_debugEvents.length}',
+                            '${_debugEvents.length + _consoleLogs.length}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9,
@@ -342,14 +426,45 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
                       ),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
+                SizedBox(width: 40),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _TabButton({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: active ? Colors.white24 : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : Colors.white54,
+            fontSize: 12,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
