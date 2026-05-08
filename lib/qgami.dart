@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:qgami_sdk/qgami_core.dart';
 
 export 'qgami_button.dart';
+export 'qgami_assistive_touch_button.dart';
 
 class QGami {
   static bool get isInitialized => QGamiCore.instance.isInitialized;
@@ -31,8 +33,12 @@ class QGami {
     );
   }
 
-  static void openGame() {
-    QGamiCore.instance.openGame();
+  static void openGame(
+    BuildContext context, {
+    required String? url,
+    required String gameSlug,
+  }) {
+    QGamiCore.instance.openGame(context, url: url, gameSlug: gameSlug);
   }
 
   static void showFloatingGameWidget() {
@@ -48,7 +54,7 @@ class QGami {
   }
 
   static Future<bool> waitUntilReady({
-    Duration timeout = const Duration(seconds: 15),
+    Duration timeout = const Duration(seconds: 2),
   }) {
     return QGamiCore.instance.waitUntilReady(timeout: timeout);
   }

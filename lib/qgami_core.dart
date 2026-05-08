@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:qgami_sdk/http/dio_client.dart';
+import 'package:qgami_sdk/qgami_web_view_page.dart';
 
 class QGamiCore {
   static final QGamiCore instance = QGamiCore._();
@@ -158,7 +160,50 @@ class QGamiCore {
     }
   }
 
-  void openGame() {}
+  void openGame(
+    BuildContext context, {
+    required String? url,
+    required String gameSlug,
+  }) {
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Game URL is not ready. Please wait for identify.'),
+        ),
+      );
+      return;
+    }
+    try {
+      Navigator.of(context).push(
+        PageRouteBuilder<void>(
+          pageBuilder:
+              (
+                BuildContext context,
+                Animation<double> animation,
+                Animation<double> secondaryAnimation,
+              ) {
+                return QgamiWebViewPage(gameSlug: gameSlug, url: url);
+              },
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(0.0, 1.0);
+            const end = Offset.zero;
+            const curve = Curves.easeOutCubic;
+
+            final tween = Tween(
+              begin: begin,
+              end: end,
+            ).chain(CurveTween(curve: curve));
+            return SlideTransition(
+              position: animation.drive(tween),
+              child: child,
+            );
+          },
+        ),
+      );
+    } catch (error) {
+      debugPrint('QgamiCore: WebView is unavailable on this platform: $error');
+    }
+  }
 
   void showFloatingWidget() {}
 
@@ -180,7 +225,7 @@ class QGamiCore {
         final playUrl = gameData['playUrl'] as String?;
         if (playUrl != null && playUrl.isNotEmpty) {
           _gameUrlMap[gameSlug] =
-              '${QGamiEnvironment.getWebViewBaseUrl(_environment)}/$playUrl';
+              '${QGamiEnvironment.getWebViewBaseUrl(_environment)}$playUrl';
           debugPrint('LOG : Fetched game URL for $gameSlug: $playUrl');
         } else {
           debugPrint('LOG : Game URL not found in response for $gameSlug');

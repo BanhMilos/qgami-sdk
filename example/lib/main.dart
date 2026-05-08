@@ -55,42 +55,50 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Qgami Example')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: 12,
-          children: [
-            ...gameSlugs.map(
-              (slug) => QgamiButton(
-                gameSlug: slug,
-                disabled: !identified,
-                customBuilder: (context) => Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              spacing: 12,
+              children: [
+                ...gameSlugs.map(
+                  (slug) => QgamiButton(
+                    gameSlug: slug,
+                    disabled: !identified,
+                    customBuilder: (context) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
 
-                  child: Text(
-                    slug,
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                      child: Text(
+                        slug,
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                    onWebViewEvent: (event) {},
                   ),
                 ),
-                onWebViewEvent: (event) {},
-              ),
-            ),
 
-            ElevatedButton(
-              onPressed: () async {
-                await _identifyUser();
-              },
-              child: const Text('Reinitialize '),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _identifyUser();
+                  },
+                  child: const Text('Reinitialize '),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          QgamiAssistiveTouchButton(
+            gameSlug: gameSlugs[1],
+            initialYPosition: MediaQuery.of(context).size.height,
+          ),
+        ],
       ),
     );
   }

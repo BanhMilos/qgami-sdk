@@ -1,6 +1,6 @@
 name: qgami_sdk
 description: "qgami_sdk for integrating QGami services"
-version: 0.0.2
+version: 0.0.3
 homepage: https://pub.dev/packages/qgami_sdk
 
 environment:

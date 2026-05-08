@@ -6,6 +6,7 @@ This package provides:
 
 - `QGami` static API for SDK lifecycle (`initialize`, `identify`, token refresh, game URL retrieval)
 - `QgamiButton` widget that preloads a game URL and opens an in-app full-screen WebView
+- `QgamiAssistiveTouchButton` draggable floating button with edge margins and initial Y position
 - `QgamiWebViewEvent` model for receiving game/webview events
 
 ## Installation
@@ -110,12 +111,55 @@ class _HomePageState extends State<HomePage> {
 }
 ```
 
+## AssistiveTouch Floating Button
+
+`QgamiAssistiveTouchButton` is a draggable floating button that snaps to the nearest left/right edge.
+
+Key options:
+
+- `horizontalEdgeMargin`: space from left/right edges
+- `verticalEdgeMargin`: space from top/bottom safe edges
+- `initialYPosition`: initial vertical position in pixels
+- `startFromRightEdge`: choose initial side (`true` = right)
+- `gameSlug`: optional; when set, default tap behavior opens the game
+- `onTap`: optional override; if provided, it is used instead of default open-game behavior
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:qgami_sdk/qgami.dart';
+
+class FloatingGameExample extends StatelessWidget {
+	const FloatingGameExample({super.key});
+
+	@override
+	Widget build(BuildContext context) {
+		return Scaffold(
+			body: Stack(
+				children: [
+					const Positioned.fill(child: Placeholder()),
+					QgamiAssistiveTouchButton(
+						gameSlug: 'slot-machine-qgami',
+						horizontalEdgeMargin: 20,
+						verticalEdgeMargin: 24,
+						initialYPosition: 220,
+					),
+				],
+			),
+		);
+	}
+}
+```
+
+Important layout note:
+
+- This widget requires bounded width and height from its parent (for example inside a `Stack` in a `Scaffold` body).
+
 ## QgamiButton Behavior
 
 - `QgamiButton` waits for SDK readiness (`initialize` + `identify`) before fetching the game URL.
-- If tapped before URL readiness, it shows a snackbar: `Game URL is not ready. Please wait for identify.`
+- On tap, it calls `QGami.openGame(context, url: ..., gameSlug: ...)`.
+- If URL is not ready, `QGami.openGame` shows a snackbar: `Game URL is not ready. Please wait for identify.`
 - On success, it opens `QgamiWebViewPage` with a full-screen slide-up transition.
-- The page now closes only on `GAME_CLOSE` events.
 
 ## WebView Events
 
@@ -134,12 +178,14 @@ SDK internals:
 
 - On `GAME_READY`, SDK sends `INIT_GAME` to web content.
 - On `ACCESS_TOKEN_EXPIRED`, SDK refreshes token and sends `UPDATE_ACCESS_TOKEN`.
+- On `GAME_CLOSE`, `QgamiWebViewPage` pops itself.
 
 ## Public API Summary
 
 - `QGami.initialize({apiKey, environment, locale})`
 - `QGami.identify({email, username, userId})`
-- `QGami.waitUntilReady({timeout})`
+- `QGami.openGame(context, {url, gameSlug})`
+- `QGami.waitUntilReady({timeout})` (default timeout from `QGami` wrapper: 2 seconds)
 - `QGami.getGameUrl({gameSlug})`
 - `QGami.refreshAccessToken()`
 - `QGami.getInitGameMessage(...)`
@@ -158,7 +204,14 @@ Environment constants:
 - `QGamiEnvironment.sandbox`
 - `QGamiEnvironment.production`
 
-Note: `QGami.openGame()`, `QGami.showFloatingGameWidget()`, and `QGami.openHub()` are currently placeholders.
+Widget exports:
+
+- `QgamiButton`
+- `QgamiAssistiveTouchButton`
+
+Notes:
+
+- `QGami.showFloatingGameWidget()` and `QGami.openHub()` are currently placeholders.
 
 ## Platform Notes
 

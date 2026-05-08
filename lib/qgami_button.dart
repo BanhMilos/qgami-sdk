@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qgami_sdk/qgami.dart';
 import 'package:qgami_sdk/qgami_web_view_event.dart';
-import 'package:qgami_sdk/qgami_web_view_page.dart';
 
 class QgamiButton extends StatefulWidget {
   final Widget Function(BuildContext)? customBuilder;
@@ -22,7 +21,7 @@ class QgamiButton extends StatefulWidget {
 }
 
 class _QgamiButtonState extends State<QgamiButton> {
-  String? _url;
+  String? _playUrl;
 
   @override
   void initState() {
@@ -36,7 +35,7 @@ class _QgamiButtonState extends State<QgamiButton> {
     final slugChanged = oldWidget.gameSlug != widget.gameSlug;
     final becameEnabled = oldWidget.disabled && !widget.disabled;
     if (slugChanged) {
-      _url = null;
+      _playUrl = null;
     }
     if (slugChanged || becameEnabled) {
       _preloadPlayUrlIfPossible();
@@ -51,8 +50,8 @@ class _QgamiButtonState extends State<QgamiButton> {
   }
 
   Future<String?> _ensurePlayUrl() async {
-    if (_url != null && _url!.isNotEmpty) {
-      return _url;
+    if (_playUrl != null && _playUrl!.isNotEmpty) {
+      return _playUrl;
     }
 
     final ready = await QGami.waitUntilReady();
@@ -64,7 +63,7 @@ class _QgamiButtonState extends State<QgamiButton> {
     if (!mounted) {
       return url;
     }
-    setState(() => _url = url);
+    setState(() => _playUrl = url);
     return url;
   }
 
@@ -78,60 +77,12 @@ class _QgamiButtonState extends State<QgamiButton> {
     return widget.customBuilder!(context);
   }
 
-  void _openGamePage(BuildContext context) {
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        pageBuilder:
-            (
-              BuildContext context,
-              Animation<double> animation,
-              Animation<double> secondaryAnimation,
-            ) {
-              return QgamiWebViewPage(
-                onWebViewEvent: widget.onWebViewEvent,
-                gameSlug: widget.gameSlug,
-                url: _url ?? '',
-              );
-            },
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(0.0, 1.0);
-          const end = Offset.zero;
-          const curve = Curves.easeOutCubic;
-
-          final tween = Tween(
-            begin: begin,
-            end: end,
-          ).chain(CurveTween(curve: curve));
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
-      ),
-    );
-  }
-
   Future<void> _handleTap(BuildContext context) async {
     final url = await _ensurePlayUrl();
     if (!context.mounted) {
       return;
     }
-    if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Game URL is not ready. Please wait for identify.'),
-        ),
-      );
-      return;
-    }
-
-    try {
-      _openGamePage(context);
-    } on AssertionError catch (error) {
-      debugPrint(
-        'QgamiButton: WebView is unavailable on this platform: $error',
-      );
-    }
+    QGami.openGame(context, url: url, gameSlug: widget.gameSlug);
   }
 
   @override
