@@ -1,3 +1,8 @@
+## 0.0.3
+
+- Added QgamiAssitiveTouchButton
+- Added more function to QgamiSDK
+
 ## 0.0.2
 
 - Added a new launch configuration for Flutter in release mode.

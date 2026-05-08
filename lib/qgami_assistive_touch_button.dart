@@ -131,7 +131,7 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
       width: widget.size,
       height: widget.size,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withValues(alpha: 0.7),
         shape: BoxShape.circle,
         boxShadow: const [
           BoxShadow(

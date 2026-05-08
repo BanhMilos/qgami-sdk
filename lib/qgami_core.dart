@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:qgami_sdk/http/dio_client.dart';
 import 'package:qgami_sdk/qgami_web_view_page.dart';
 
