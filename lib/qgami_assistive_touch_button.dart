@@ -3,28 +3,34 @@ import 'package:qgami_sdk/qgami.dart';
 
 class QgamiAssistiveTouchButton extends StatefulWidget {
   final VoidCallback? onTap;
+  final VoidCallback? onCloseTap;
   final Widget? child;
   final double size;
   final double horizontalEdgeMargin;
   final double verticalEdgeMargin;
-  final double initialYPosition;
   final bool startFromRightEdge;
+  final bool startFromBottomEdge;
   final Duration snapAnimationDuration;
   final Curve snapAnimationCurve;
   final String? gameSlug;
+  final bool isClosed;
+  final QgamiInitGameMessage? initMessage;
 
   const QgamiAssistiveTouchButton({
     super.key,
     this.onTap,
+    this.onCloseTap,
     this.child,
-    this.size = 56,
+    this.size = 80,
     this.horizontalEdgeMargin = 16,
     this.verticalEdgeMargin = 16,
-    this.initialYPosition = 160,
     this.startFromRightEdge = true,
+    this.startFromBottomEdge = false,
     this.snapAnimationDuration = const Duration(milliseconds: 180),
     this.snapAnimationCurve = Curves.easeOut,
     this.gameSlug,
+    this.isClosed = false,
+    this.initMessage,
   });
 
   @override
@@ -36,12 +42,11 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
   double? _left;
   double? _top;
   bool _isDragging = false;
-
+  bool _hasUserMoved = false;
   double _minLeft = 0;
   double _maxLeft = 0;
   double _minTop = 0;
   double _maxTop = 0;
-  String? _playUrl;
 
   @override
   void initState() {
@@ -53,9 +58,6 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
   void didUpdateWidget(covariant QgamiAssistiveTouchButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     final slugChanged = oldWidget.gameSlug != widget.gameSlug;
-    if (slugChanged) {
-      _playUrl = null;
-    }
     if (slugChanged) {
       _preloadPlayUrlIfPossible();
     }
@@ -69,10 +71,6 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
     if (widget.gameSlug == null) {
       return null;
     }
-    if (_playUrl != null && _playUrl!.isNotEmpty) {
-      return _playUrl;
-    }
-
     final ready = await QGami.waitUntilReady();
     if (!ready) {
       return null;
@@ -82,13 +80,25 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
     if (!mounted) {
       return url;
     }
-    setState(() => _playUrl = url);
     return url;
   }
 
-  void _computeBounds(BoxConstraints constraints, MediaQueryData mediaQuery) {
-    final width = constraints.maxWidth;
-    final height = constraints.maxHeight;
+  ({double width, double height}) _computeBounds(
+    BoxConstraints constraints,
+    MediaQueryData mediaQuery,
+  ) {
+    final width =
+        constraints.hasBoundedWidth &&
+            constraints.maxWidth.isFinite &&
+            constraints.maxWidth > 0
+        ? constraints.maxWidth
+        : mediaQuery.size.width;
+    final height =
+        constraints.hasBoundedHeight &&
+            constraints.maxHeight.isFinite &&
+            constraints.maxHeight > 0
+        ? constraints.maxHeight
+        : mediaQuery.size.height;
 
     _minLeft = widget.horizontalEdgeMargin;
     _maxLeft = width - widget.size - widget.horizontalEdgeMargin;
@@ -106,9 +116,17 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
     if (_maxTop < _minTop) {
       _maxTop = _minTop;
     }
+
+    return (width: width, height: height);
   }
 
   void _initializePositionIfNeeded() {
+    if (!_hasUserMoved) {
+      _left = widget.startFromRightEdge ? _maxLeft : _minLeft;
+      _top = widget.startFromBottomEdge ? _maxTop : _minTop;
+      return;
+    }
+
     if (_left != null && _top != null) {
       _left = _left!.clamp(_minLeft, _maxLeft).toDouble();
       _top = _top!.clamp(_minTop, _maxTop).toDouble();
@@ -116,7 +134,7 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
     }
 
     _left = widget.startFromRightEdge ? _maxLeft : _minLeft;
-    _top = widget.initialYPosition.clamp(_minTop, _maxTop).toDouble();
+    _top = widget.startFromBottomEdge ? _maxTop : _minTop;
   }
 
   void _snapToNearestHorizontalEdge() {
@@ -127,21 +145,74 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
   }
 
   Widget _buildDefaultButton() {
-    return Container(
-      width: widget.size,
-      height: widget.size,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.7),
-        shape: BoxShape.circle,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000),
-            blurRadius: 12,
-            offset: Offset(0, 6),
+    return Opacity(
+      opacity: widget.isClosed ? 0 : 1,
+      child: Stack(
+        children: [
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Image.asset(
+              'assets/images/img_lucky_spin.png',
+              package: 'qgami_sdk',
+              width: widget.size - 20,
+              height: widget.size - 20,
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 0,
+            child: GestureDetector(
+              onTap:
+                  widget.onCloseTap ??
+                  () {
+                    setState(() {
+                      _hasUserMoved = false;
+                      _left = null;
+                      _top = null;
+                    });
+                  },
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.topLeft,
+            child: GestureDetector(
+              onTap:
+                  widget.onCloseTap ??
+                  () {
+                    setState(() {
+                      _hasUserMoved = false;
+                      _left = null;
+                      _top = null;
+                    });
+                  },
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Text(
+                  "1",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      child: const Icon(Icons.touch_app, color: Colors.white),
     );
   }
 
@@ -158,60 +229,70 @@ class _QgamiAssistiveTouchButtonState extends State<QgamiAssistiveTouchButton> {
           'Wrap it in a SizedBox/Stack with finite constraints.',
         );
 
-        _computeBounds(constraints, mediaQuery);
+        final bounds = _computeBounds(constraints, mediaQuery);
         _initializePositionIfNeeded();
 
-        return Stack(
-          children: [
-            AnimatedPositioned(
-              duration: _isDragging
-                  ? Duration.zero
-                  : widget.snapAnimationDuration,
-              curve: widget.snapAnimationCurve,
-              left: _left,
-              top: _top,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () async {
-                  if (widget.onTap != null) {
-                    widget.onTap!();
-                    return;
-                  }
-                  final url = await _ensurePlayUrl();
-                  if (!context.mounted || widget.gameSlug == null) {
-                    return;
-                  }
-                  QGami.openGame(context, url: url, gameSlug: widget.gameSlug!);
-                },
-                onPanStart: (_) {
-                  setState(() {
-                    _isDragging = true;
-                  });
-                },
-                onPanUpdate: (details) {
-                  setState(() {
-                    _left = (_left! + details.delta.dx)
-                        .clamp(_minLeft, _maxLeft)
-                        .toDouble();
-                    _top = (_top! + details.delta.dy)
-                        .clamp(_minTop, _maxTop)
-                        .toDouble();
-                  });
-                },
-                onPanEnd: (_) {
-                  setState(() {
-                    _isDragging = false;
-                    _snapToNearestHorizontalEdge();
-                  });
-                },
-                child: SizedBox(
-                  width: widget.size,
-                  height: widget.size,
-                  child: widget.child ?? _buildDefaultButton(),
+        return SizedBox(
+          width: bounds.width,
+          height: bounds.height,
+          child: Stack(
+            children: [
+              AnimatedPositioned(
+                duration: _isDragging
+                    ? Duration.zero
+                    : widget.snapAnimationDuration,
+                curve: widget.snapAnimationCurve,
+                left: _left,
+                top: _top,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () async {
+                    if (widget.onTap != null) {
+                      widget.onTap!();
+                      return;
+                    }
+                    final url = await _ensurePlayUrl();
+                    if (!context.mounted || widget.gameSlug == null) {
+                      return;
+                    }
+                    QGami.openGame(
+                      context,
+                      url: url,
+                      gameSlug: widget.gameSlug!,
+                      initMessage: widget.initMessage,
+                    );
+                  },
+                  onPanStart: (_) {
+                    setState(() {
+                      _isDragging = true;
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    setState(() {
+                      _hasUserMoved = true;
+                      _left = (_left! + details.delta.dx)
+                          .clamp(_minLeft, _maxLeft)
+                          .toDouble();
+                      _top = (_top! + details.delta.dy)
+                          .clamp(_minTop, _maxTop)
+                          .toDouble();
+                    });
+                  },
+                  onPanEnd: (_) {
+                    setState(() {
+                      _isDragging = false;
+                      _snapToNearestHorizontalEdge();
+                    });
+                  },
+                  child: SizedBox(
+                    width: widget.size,
+                    height: widget.size,
+                    child: widget.child ?? _buildDefaultButton(),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );

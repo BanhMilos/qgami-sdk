@@ -9,6 +9,8 @@ class QgamiWebViewEvent {
   static const String gamePlayResult = 'GAME_PLAY_RESULT';
   static const String gamePlayError = 'GAME_PLAY_ERROR';
   static const String gameClose = 'GAME_CLOSE';
+  static const String showRewardHistory = 'SHOW_REWARD_HISTORY';
+  static const String showMissionCenter = 'SHOW_MISSION_CENTER';
 
   final String type;
   final Map<String, dynamic> data;

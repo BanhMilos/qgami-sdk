@@ -7,6 +7,7 @@ class QgamiButton extends StatefulWidget {
   final String gameSlug;
   final ValueChanged<QgamiWebViewEvent>? onWebViewEvent;
   final bool disabled;
+  final QgamiInitGameMessage? initMessage;
 
   const QgamiButton({
     super.key,
@@ -14,6 +15,7 @@ class QgamiButton extends StatefulWidget {
     required this.gameSlug,
     this.onWebViewEvent,
     this.disabled = false,
+    this.initMessage,
   });
 
   @override
@@ -77,18 +79,28 @@ class _QgamiButtonState extends State<QgamiButton> {
     return widget.customBuilder!(context);
   }
 
-  Future<void> _handleTap(BuildContext context) async {
+  Future<void> _handleTap(
+    BuildContext context, {
+    QgamiInitGameMessage? initMessage,
+  }) async {
     final url = await _ensurePlayUrl();
     if (!context.mounted) {
       return;
     }
-    QGami.openGame(context, url: url, gameSlug: widget.gameSlug);
+    QGami.openGame(
+      context,
+      url: url,
+      gameSlug: widget.gameSlug,
+      initMessage: initMessage,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.disabled ? null : () async => _handleTap(context),
+      onTap: widget.disabled
+          ? null
+          : () async => _handleTap(context, initMessage: widget.initMessage),
       child: _buildButton(context),
     );
   }

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:qgami_sdk/http/dio_client.dart';
+import 'package:qgami_sdk/qgami_init_game_message.dart';
 import 'package:qgami_sdk/qgami_web_view_page.dart';
 
 class QGamiCore {
@@ -163,6 +164,7 @@ class QGamiCore {
     BuildContext context, {
     required String? url,
     required String gameSlug,
+    QgamiInitGameMessage? initMessage,
   }) {
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -181,7 +183,11 @@ class QGamiCore {
                 Animation<double> animation,
                 Animation<double> secondaryAnimation,
               ) {
-                return QgamiWebViewPage(gameSlug: gameSlug, url: url);
+                return QgamiWebViewPage(
+                  gameSlug: gameSlug,
+                  url: url,
+                  initMessage: initMessage,
+                );
               },
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             const begin = Offset(0.0, 1.0);
@@ -203,8 +209,6 @@ class QGamiCore {
       debugPrint('QgamiCore: WebView is unavailable on this platform: $error');
     }
   }
-
-  void showFloatingWidget() {}
 
   void openHub() {}
 
@@ -306,28 +310,29 @@ class QGamiCore {
 
   // }
 
-  Map<String, dynamic> getInitGameMessage({
+  QgamiInitGameMessage getInitGameMessage({
     String? gameSlug,
     required String mode,
     required bool showCloseBtn,
+    required bool showRewardHistoryBtn,
     required double paddingTop,
     required double paddingBottom,
   }) {
-    return {
-      'type': 'INIT_GAME',
-      'mode': mode,
-      'gameSlug': gameSlug,
-      'accessToken': _accessToken,
-      'deviceId': _deviceId,
-      'sessionId': _sessionId,
-      'showCloseBtn': showCloseBtn,
-      'paddingTop': paddingTop,
-      "paddingBottom": paddingBottom,
-    };
+    return QgamiInitGameMessage(
+      mode: mode,
+      gameSlug: gameSlug,
+      accessToken: _accessToken,
+      deviceId: _deviceId,
+      sessionId: _sessionId,
+      showCloseBtn: showCloseBtn,
+      showRewardHistoryBtn: showRewardHistoryBtn,
+      paddingTop: paddingTop,
+      paddingBottom: paddingBottom,
+    );
   }
 
   Map<String, dynamic> getUpdateAccessTokenMessage({
-    required String accessToken,
+    required String? accessToken,
   }) {
     return {'type': 'UPDATE_ACCESS_TOKEN', 'accessToken': accessToken};
   }

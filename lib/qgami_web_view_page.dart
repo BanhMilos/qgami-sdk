@@ -9,12 +9,14 @@ class QgamiWebViewPage extends StatefulWidget {
   final ValueChanged<QgamiWebViewEvent>? onWebViewEvent;
   final String gameSlug;
   final String url;
+  final QgamiInitGameMessage? initMessage;
 
   const QgamiWebViewPage({
     super.key,
     this.onWebViewEvent,
     required this.gameSlug,
     required this.url,
+    this.initMessage,
   });
 
   @override
@@ -30,6 +32,7 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
   final List<({JavaScriptLogLevel level, String message})> _consoleLogs = [];
   bool _showDebugPanel = false;
   int _debugTab = 0; // 0 = Events, 1 = Console
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -46,6 +49,12 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
         NavigationDelegate(
           onPageStarted: (String url) async {
             await _installMessageBridge();
+          },
+          onPageFinished: (String url) {
+            debugPrint('LOG : Page finished loading: $url');
+            setState(() {
+              _isLoading = false;
+            });
           },
           onNavigationRequest: (NavigationRequest request) {
             if (request.url.startsWith('https://www.youtube.com/')) {
@@ -109,7 +118,7 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
     }
   }
 
-  Future<void> _sendMessageToWeb(Map<String, dynamic> message) async {
+  Future<void> _sendMessageToWeb(Object message) async {
     final encodedMessage = jsonEncode(message);
 
     await controller.runJavaScript('''
@@ -126,13 +135,15 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
   }
 
   Future<void> _initGame() async {
-    final message = QGami.getInitGameMessage(
+    var message = QGami.getInitGameMessage(
       gameSlug: widget.gameSlug,
       mode: 'REMOTE',
       showCloseBtn: true,
+      showRewardHistoryBtn: true,
       paddingTop: MediaQuery.of(context).padding.top,
       paddingBottom: MediaQuery.of(context).padding.bottom,
     );
+    message = widget.initMessage ?? message;
     try {
       await _sendMessageToWeb(message);
       debugPrint('LOG : Qgami INIT_GAME sent $message');
@@ -143,16 +154,11 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
 
   Future<void> _updateAccessToken() async {
     final accessToken = await QGami.refreshAccessToken();
-    if (accessToken == null || accessToken.isEmpty) {
-      debugPrint('LOG : Qgami UPDATE_ACCESS_TOKEN skipped: empty token');
-      return;
-    }
-
     final message = QGami.getUpdateAccessTokenMessage(accessToken: accessToken);
 
     try {
       await _sendMessageToWeb(message);
-      debugPrint('LOG : Qgami UPDATE_ACCESS_TOKEN sent');
+      debugPrint('LOG : Qgami UPDATE_ACCESS_TOKEN sent $message');
     } catch (e) {
       debugPrint('LOG : Qgami UPDATE_ACCESS_TOKEN send failed: $e');
     }
@@ -263,175 +269,185 @@ class _QgamiWebViewPageState extends State<QgamiWebViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          WebViewWidget(controller: controller),
-          if (_showDebugPanel)
-            Positioned(
-              top: 80,
-              left: 8,
-              right: 8,
-              bottom: 80,
-              child: Material(
-                color: Colors.black.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      child: Row(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
+              children: [
+                WebViewWidget(controller: controller),
+                if (_showDebugPanel)
+                  Positioned(
+                    top: 80,
+                    left: 8,
+                    right: 8,
+                    bottom: 80,
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _TabButton(
-                            label: 'Events',
-                            active: _debugTab == 0,
-                            onTap: () => setState(() => _debugTab = 0),
-                          ),
-                          const SizedBox(width: 8),
-                          _TabButton(
-                            label: 'Console',
-                            active: _debugTab == 1,
-                            onTap: () => setState(() => _debugTab = 1),
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () => setState(() {
-                              if (_debugTab == 0) {
-                                _debugEvents.clear();
-                              } else {
-                                _consoleLogs.clear();
-                              }
-                            }),
-                            child: const Text(
-                              'Clear',
-                              style: TextStyle(
-                                color: Colors.redAccent,
-                                fontSize: 12,
-                              ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
                             ),
+                            child: Row(
+                              children: [
+                                _TabButton(
+                                  label: 'Events',
+                                  active: _debugTab == 0,
+                                  onTap: () => setState(() => _debugTab = 0),
+                                ),
+                                const SizedBox(width: 8),
+                                _TabButton(
+                                  label: 'Console',
+                                  active: _debugTab == 1,
+                                  onTap: () => setState(() => _debugTab = 1),
+                                ),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: () => setState(() {
+                                    if (_debugTab == 0) {
+                                      _debugEvents.clear();
+                                    } else {
+                                      _consoleLogs.clear();
+                                    }
+                                  }),
+                                  child: const Text(
+                                    'Clear',
+                                    style: TextStyle(
+                                      color: Colors.redAccent,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(color: Colors.white24, height: 1),
+                          Expanded(
+                            child: _debugTab == 0
+                                ? (_debugEvents.isEmpty
+                                      ? const Center(
+                                          child: Text(
+                                            'No events yet',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.all(8),
+                                          itemCount: _debugEvents.length,
+                                          itemBuilder: (context, index) {
+                                            final e = _debugEvents[index];
+                                            return Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 2,
+                                                  ),
+                                              child: Text(
+                                                '[${index + 1}] ${e.type}${e.data.isNotEmpty ? '  ${e.data}' : ''}',
+                                                style: const TextStyle(
+                                                  color: Colors.greenAccent,
+                                                  fontSize: 11,
+                                                  fontFamily: 'monospace',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ))
+                                : (_consoleLogs.isEmpty
+                                      ? const Center(
+                                          child: Text(
+                                            'No console output yet',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.all(8),
+                                          itemCount: _consoleLogs.length,
+                                          itemBuilder: (context, index) {
+                                            final log = _consoleLogs[index];
+                                            final color = _consoleColor(
+                                              log.level,
+                                            );
+                                            final prefix = _consolePrefix(
+                                              log.level,
+                                            );
+                                            return Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 2,
+                                                  ),
+                                              child: Text(
+                                                '$prefix ${log.message}',
+                                                style: TextStyle(
+                                                  color: color,
+                                                  fontSize: 11,
+                                                  fontFamily: 'monospace',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        )),
                           ),
                         ],
                       ),
                     ),
-                    const Divider(color: Colors.white24, height: 1),
-                    Expanded(
-                      child: _debugTab == 0
-                          ? (_debugEvents.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'No events yet',
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    padding: const EdgeInsets.all(8),
-                                    itemCount: _debugEvents.length,
-                                    itemBuilder: (context, index) {
-                                      final e = _debugEvents[index];
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 2,
-                                        ),
-                                        child: Text(
-                                          '[${index + 1}] ${e.type}${e.data.isNotEmpty ? '  ${e.data}' : ''}',
-                                          style: const TextStyle(
-                                            color: Colors.greenAccent,
-                                            fontSize: 11,
-                                            fontFamily: 'monospace',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ))
-                          : (_consoleLogs.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'No console output yet',
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    padding: const EdgeInsets.all(8),
-                                    itemCount: _consoleLogs.length,
-                                    itemBuilder: (context, index) {
-                                      final log = _consoleLogs[index];
-                                      final color = _consoleColor(log.level);
-                                      final prefix = _consolePrefix(log.level);
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 2,
-                                        ),
-                                        child: Text(
-                                          '$prefix ${log.message}',
-                                          style: TextStyle(
-                                            color: color,
-                                            fontSize: 11,
-                                            fontFamily: 'monospace',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  )),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          Positioned(
-            top: 40,
-            right: 20,
-            child: Row(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        _showDebugPanel
-                            ? Icons.bug_report
-                            : Icons.bug_report_outlined,
-                        color: Colors.white,
-                      ),
-                      onPressed: () =>
-                          setState(() => _showDebugPanel = !_showDebugPanel),
-                    ),
-                    if (_debugEvents.isNotEmpty || _consoleLogs.isNotEmpty)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${_debugEvents.length + _consoleLogs.length}',
-                            style: const TextStyle(
+                  ),
+                Positioned(
+                  top: 40,
+                  right: 20,
+                  child: Row(
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              _showDebugPanel
+                                  ? Icons.bug_report
+                                  : Icons.bug_report_outlined,
                               color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+                            ),
+                            onPressed: () => setState(
+                              () => _showDebugPanel = !_showDebugPanel,
                             ),
                           ),
-                        ),
+                          if (_debugEvents.isNotEmpty ||
+                              _consoleLogs.isNotEmpty)
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '${_debugEvents.length + _consoleLogs.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                  ],
+                      SizedBox(width: 40),
+                    ],
+                  ),
                 ),
-                SizedBox(width: 40),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

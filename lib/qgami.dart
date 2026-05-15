@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:qgami_sdk/qgami_core.dart';
+import 'package:qgami_sdk/qgami_init_game_message.dart';
+
+export 'qgami_init_game_message.dart';
 
 export 'qgami_button.dart';
 export 'qgami_assistive_touch_button.dart';
@@ -37,12 +40,14 @@ class QGami {
     BuildContext context, {
     required String? url,
     required String gameSlug,
+    QgamiInitGameMessage? initMessage,
   }) {
-    QGamiCore.instance.openGame(context, url: url, gameSlug: gameSlug);
-  }
-
-  static void showFloatingGameWidget() {
-    QGamiCore.instance.showFloatingWidget();
+    QGamiCore.instance.openGame(
+      context,
+      url: url,
+      gameSlug: gameSlug,
+      initMessage: initMessage,
+    );
   }
 
   static void openHub() {
@@ -59,10 +64,11 @@ class QGami {
     return QGamiCore.instance.waitUntilReady(timeout: timeout);
   }
 
-  static Map<String, dynamic> getInitGameMessage({
+  static QgamiInitGameMessage getInitGameMessage({
     String? gameSlug,
     required String mode,
     required bool showCloseBtn,
+    required bool showRewardHistoryBtn,
     required double paddingTop,
     required double paddingBottom,
   }) {
@@ -70,6 +76,7 @@ class QGami {
       gameSlug: gameSlug,
       mode: mode,
       showCloseBtn: showCloseBtn,
+      showRewardHistoryBtn: showRewardHistoryBtn,
       paddingTop: paddingTop,
       paddingBottom: paddingBottom,
     );
@@ -80,7 +87,7 @@ class QGami {
   }
 
   static Map<String, dynamic> getUpdateAccessTokenMessage({
-    required String accessToken,
+    required String? accessToken,
   }) {
     return QGamiCore.instance.getUpdateAccessTokenMessage(
       accessToken: accessToken,

@@ -1,6 +1,6 @@
 name: qgami_sdk
 description: "qgami_sdk for integrating QGami services"
-version: 0.0.3
+version: 0.0.4
 homepage: https://pub.dev/packages/qgami_sdk
 
 environment:
@@ -23,7 +23,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
+  assets:
+    - assets/images/
   # To add assets to your package, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
