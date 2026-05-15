@@ -37,6 +37,18 @@ class _MainScreenState extends State<MainScreen> {
   bool _showDebugPanel = false;
   bool _isClosed = false;
   double _debugAssitiveTouchBtnSize = 80;
+
+  QgamiInitGameMessage _buildInitMessage(String gameSlug) {
+    return QGami.getInitGameMessage(
+      gameSlug: gameSlug,
+      mode: 'REMOTE',
+      showCloseBtn: _debugShowCloseBtn,
+      showRewardHistoryBtn: true,
+      paddingTop: double.tryParse(_paddingTopController.text) ?? 0,
+      paddingBottom: double.tryParse(_paddingBottomController.text) ?? 0,
+    );
+  }
+
   @override
   void dispose() {
     _paddingTopController.dispose();
@@ -113,6 +125,7 @@ class _MainScreenState extends State<MainScreen> {
                     ...gameSlugs.map(
                       (slug) => QgamiButton(
                         gameSlug: slug,
+                        initMessage: _buildInitMessage(slug),
                         disabled: !identified,
                         customBuilder: (context) => Container(
                           padding: const EdgeInsets.symmetric(
@@ -140,6 +153,7 @@ class _MainScreenState extends State<MainScreen> {
                           url:
                               "http://10.10.3.146:5173/games/chance/slot-machine/v1/",
                           gameSlug: gameSlugs[0],
+                          initMessage: _buildInitMessage(gameSlugs[0]),
                         );
                       },
                       child: const Text('LAN url'),
@@ -274,6 +288,7 @@ class _MainScreenState extends State<MainScreen> {
             isClosed: _isClosed,
             startFromBottomEdge: true,
             size: _debugAssitiveTouchBtnSize,
+            initMessage: _buildInitMessage(gameSlugs[1]),
             onCloseTap: () {
               setState(() {
                 _isClosed = true;
